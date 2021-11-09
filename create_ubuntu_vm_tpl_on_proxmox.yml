@@ -1,0 +1,36 @@
+- name: Change host variable
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Use hostname from env var working_host
+      add_host:
+        name: "{{ working_host }}"
+        groups: working_group
+  tags:
+    - always
+
+- name: Create VM Template
+  hosts: working_group
+  gather_facts: true
+  remote_user: root
+  # become: true
+  vars:
+    ANSIBLE_ROLES_PATH: roles/
+    # ansible_python_interpreter: /usr/bin/python
+    ansible_ssh_port: 22
+    
+    # image_version: hirsute
+    # vm_template:
+    # vm_memory:
+    # vm_cores:
+    # vm_sockets:
+    # numa:
+    # storage: # pvesm status
+    # vm_id:
+    # network_bridge:
+
+    ## Cloud Init
+    # public_ssh_key: # public SSH Key string
+
+  roles:
+    - create_ubuntu_vm_tpl_on_proxmox

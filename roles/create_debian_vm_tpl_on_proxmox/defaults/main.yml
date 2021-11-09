@@ -1,0 +1,23 @@
+---
+# defaults file for create_debian_vm_tpl_on_proxmox
+## Debian Official Cloud Images: https://cloud.debian.org/images/cloud/
+
+## Set bullseye or buster
+release_name: bullseye
+release_number: 11
+
+## Debian GenericCloud Image
+image_url: "https://cloud.debian.org/images/cloud/{{ release_name }}/latest"
+image_name: "debian-{{ release_number }}-genericcloud-amd64.qcow2"
+
+vm_template: "ci-debian-{{ release_number }}-tpl"
+vm_memory: 2048
+vm_cores: 4
+vm_sockets: 1
+numa: 1
+storage: "local-zfs" # pvesm status
+vm_id: 9002
+network_bridge: vmbr0
+
+## Cloud Init
+# public_ssh_key: # public SSH Key string

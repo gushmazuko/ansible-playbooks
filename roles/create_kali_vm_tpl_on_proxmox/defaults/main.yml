@@ -1,0 +1,21 @@
+---
+# defaults file for create_kali_vm_tpl_on_proxmox
+## Official Kali Virtual Machine Images: https://kali.download/virtual-images/current/
+
+## Kali Linux VMware Image
+image_url: "https://kali.download/virtual-images/current/"
+compressed_image_name: "kali-linux-{{ image_version }}-vmware-amd64.7z"
+vmdk_image_dir: "kali-linux-{{ image_version }}-vmware-amd64.vmwarevm"
+vmdk_image_name: "Kali-Linux-{{ image_version }}-vmware-amd64.vmdk"
+qcow2_image_name: "kali-linux-{{ image_version }}-amd64.qcow2"
+
+mchrdir: "/mnt/chroot"
+
+vm_template: "kali-linux-{{ image_version }}-tpl"
+vm_memory: 2048
+vm_cores: 4
+vm_sockets: 1
+numa: 1
+storage: "local-zfs" # pvesm status
+vm_id: 9000
+network_bridge: vmbr0
