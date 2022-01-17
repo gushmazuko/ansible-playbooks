@@ -3,7 +3,7 @@
 
 - name: Get latest Kali version
   ansible.builtin.shell: |
-    curl -sL {{ image_url }} | grep -oP 'kali-linux-\K[0-9]+[0-9]+[0-9]+[0-9]+\.[0-9](?=-vmware)' | head -1
+    curl -sL {{ image_url }} | grep -oP 'kali-linux-\K[0-9]+[0-9]+[0-9]+[0-9]+\.[0-9].?(?=-vmware)' | head -1
   register: image_ver
   tags:
     - get_latest
