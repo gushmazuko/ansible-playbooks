@@ -23,7 +23,7 @@
 
 - name: Decompress donwloaded image
   ansible.builtin.shell: |
-    p7zip -d {{ compressed_image_name }}
+    7z e {{ compressed_image_name }} -o{{ vmdk_image_dir }}
   args:
     chdir: /tmp/
   tags:

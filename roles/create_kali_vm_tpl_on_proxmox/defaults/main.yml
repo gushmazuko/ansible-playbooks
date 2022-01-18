@@ -5,7 +5,7 @@
 ## Kali Linux VMware Image
 image_url: "https://kali.download/virtual-images/current/"
 compressed_image_name: "kali-linux-{{ image_version }}-vmware-amd64.7z"
-vmdk_image_dir: "kali-linux-{{ image_version }}-vmware-amd64.vmwarevm"
+vmdk_image_dir: "kali-linux"
 vmdk_image_name: "Kali-Linux-{{ image_version }}-vmware-amd64.vmdk"
 qcow2_image_name: "kali-linux-{{ image_version }}-amd64.qcow2"
 
