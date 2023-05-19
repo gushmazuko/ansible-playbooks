@@ -1,0 +1,7 @@
+galaxy_info:
+  author: gushmazuko
+  description: Deploy Proxmox on Hetzner
+  license: MIT
+  min_ansible_version: 2.1
+  galaxy_tags: []
+dependencies: []
