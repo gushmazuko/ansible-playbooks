@@ -1,9 +1,30 @@
 ---
 # tasks file for deploy_proxmox_on_hetzner
+- name: Retrieve ISO directory page
+  uri:
+    url: "{{ base_url }}"
+    return_content: yes
+  register: webpage
+  when: image_url is not defined or image_url == ""
+
+- name: Parse webpage content to find ISO versions
+  set_fact:
+    iso_version: "{{ webpage.content | regex_findall('proxmox-ve_(\\d+\\.\\d+-\\d)\\.iso') | sort | last }}"
+  when: image_url is not defined or image_url == ""
+
+- name: Construct full URL for latest version
+  set_fact:
+    image_url: "{{ base_url }}proxmox-ve_{{ iso_version }}.iso"
+  when: image_url is not defined or image_url == ""
+
+- name: Print ISO URL
+  debug:
+    var: image_url
+
 - name: Fetch Proxmox VE ISO
   get_url:
     url: "{{ image_url }}"
-    dest: "/tmp/{{ image_name }}"
+    dest: "{{ image_path }}"
   register: get_iso
   failed_when: get_iso is failed
   tags:
@@ -23,7 +44,7 @@
         udevadm info -q property /sys/class/net/eth0 | grep "ID_NET_NAME_PATH=" | cut -d'=' -f2
       register: actual_interface_name
 
-    - name: Extract IP Address and CIDR
+    - name: Extract IP Address & CIDR
       shell: |
         ip addr show eth0 | grep "inet\b" | awk '{print $2}'
       register: ip_cidr
@@ -32,7 +53,7 @@
       shell: ip route | grep default | awk '{print $3}'
       register: gateway
 
-    - name: Split IP Address, CIDR and Gateway Into Separate Variables
+    - name: Split IP Address, CIDR & Gateway Into Separate Variables
       set_fact:
         ip_address: "{{ ip_cidr.stdout.split('/')[0] }}"
         cidr: "{{ ip_cidr.stdout.split('/')[1] }}"
@@ -40,37 +61,26 @@
   tags: 
     - acquire_network_config
 
-- name: Manage Network Configuration File
-  block:
-    - name: Generate Network Configuration for Proxmox VM
-      vars:
-        interface: "{{ actual_interface_name.stdout }}"
-      copy:
-        content: |
-          auto lo
-          iface lo inet loopback
+- name: Generate Network Configuration for Proxmox VM
+  vars:
+    interface: "{{ actual_interface_name.stdout }}"
+  copy:
+    content: |
+      auto lo
+      iface lo inet loopback
 
-          iface {{ interface }} inet manual
+      iface {{ interface }} inet manual
 
-          auto vmbr0
-          iface vmbr0 inet static
-            address {{ ip_address }}
-            netmask {{ cidr }}
-            gateway {{ gateway }}
-            bridge_ports {{ interface }}
-            bridge_stp off
-            bridge_fd 0
-        dest: "/tmp/proxmox_network_config"
-
-    - name: Send Network Configuration File to termbin.com
-      shell: cat /tmp/proxmox_network_config | nc termbin.com 9999
-      register: termbin_url
-
-    - name: Reveal Network Configuration File Link
-      debug:
-        msg: "Network configuration file has been uploaded to termbin.com. \n Here is the URL: {{ termbin_url.stdout | trim }}"
+      auto vmbr0
+      iface vmbr0 inet static
+        address {{ ip_address }}/{{ cidr }}
+        gateway {{ gateway }}
+        bridge_ports {{ interface }}
+        bridge_stp off
+        bridge_fd 0
+    dest: "{{ network_config_local_path }}"
   tags:
-    - manage_network_config_file
+    - generate_network_config
 
 - name: Initiate QEMU with CDROM for Proxmox Installation
   block:
@@ -79,61 +89,97 @@
         qemu-system-x86_64 -daemonize -enable-kvm -m {{ vm_memory }} \
         -hda /dev/{{ disk_info.stdout_lines[0].split(' ')[0] }} \
         -hdb /dev/{{ disk_info.stdout_lines[1].split(' ')[0] }} \
-        -cdrom /tmp/{{ image_name }} -boot d -vnc :0,password -monitor telnet:127.0.0.1:4444,server,nowait
+        -cdrom {{ image_path }} -boot d -vnc :0,password -monitor telnet:127.0.0.1:4444,server,nowait
+
+    - name: Set VNC password
+      shell: echo "change vnc password {{ vnc_password }}" | nc -q 1 127.0.0.1 4444
+  tags:
+    - initiate_qemu_with_cdrom
+
+- name: Control QEMU Shutdown After Proxmox Installation
+  block:
+    - name: Pause for Manual Intervention and Display VNC Connection Details
+      pause:
+        prompt: |
+
+          To access Proxmox VE installation interface, connect to this machine:
+            - via VNC viewer at '{{ ip_address }}:5900' using password '{{ vnc_password }}'
+          Complete the Proxmox installation and press ENTER to stop QEMU (Switch to the next task)
+
+    - name: Send QMP Command to Terminate QEMU (SIGTERM)
+      shell: |
+        printf "quit\n" | nc 127.0.0.1 4444
+  tags:
+    - control_qemu_shutdown
+
+- name: Configure QEMU Startup Post Proxmox Installation
+  block:
+    - name: Kick off QEMU Without CDROM After Proxmox Installation (asynchronously)
+      shell: |
+        qemu-system-x86_64 -daemonize -enable-kvm -m {{ vm_memory }} \
+        -hda /dev/{{ disk_info.stdout_lines[0].split(' ')[0] }} \
+        -hdb /dev/{{ disk_info.stdout_lines[1].split(' ')[0] }} \
+        -vnc :0,password -monitor telnet:127.0.0.1:4444,server,nowait \
+        -net user,hostfwd=tcp::{{ proxmox_ssh_port }}-:22 -net nic
 
     - name: Set VNC password
       shell: echo "change vnc password {{ vnc_password }}" | nc -q 1 127.0.0.1 4444
 
-    - name: Display VNC Connection Details
-      ansible.builtin.debug:
-        msg: "Please connect to the VNC server at '{{ ip_address }}:5900' with the password '{{ vnc_password }}' to install Proxmox"
-  tags:
-    - initiate_qemu_with_cdrom
+    - name: Wait for the Proxmox VM to be ready
+      pause:
+        seconds: 15
 
-- name: Control QEMU Post Proxmox Installation
+    - name: Ensure sshpass is installed
+      apt:
+        name: sshpass
+        state: present
+
+    - name: Transfer Network Configuration file and update nameserver via SSH on Proxmox VM
+      shell: |
+        sshpass -p "{{ proxmox_password }}" scp -o StrictHostKeyChecking=no -P {{ proxmox_ssh_port }} {{ network_config_local_path }} root@{{ proxmox_host }}:{{ network_config_remote_path }}
+        sshpass -p "{{ proxmox_password }}" ssh -o StrictHostKeyChecking=no -p {{ proxmox_ssh_port }} root@{{ proxmox_host }} "sed -i 's/nameserver.*/nameserver {{ nameserver }}/' /etc/resolv.conf"
+      environment:
+        ANSIBLE_HOST_KEY_CHECKING: "False"
+  tags:
+    - configure_qemu_startup
+
+- name: Control QEMU Pause, Shutdown & Connection Info
   block:
     - name: Pause for Manual Intervention
       pause:
-        prompt: "Complete the Proxmox installation and press ENTER to stop QEMU gracefully. (Switch to the next task)"
+        prompt: |
 
-    # - name: Stop QEMU gracefully after Proxmox installation
-    #   command: kill -s SIGTERM $(pgrep qemu-system)
-    #   # become: yes
-    - name: Send QMP Command to Gracefully Terminate QEMU
+          Network Configuration has been successfully transferred to the Proxmox VM.
+          If you want to perform some manual configuration, connect to the VM via:
+            - VNC at '{{ ip_address }}:5900' using the password '{{ vnc_password }}'
+            - SSH at 'root@{{ ip_address }} -p {{ proxmox_ssh_port }}' using the password '{{ proxmox_password }}'
+          Press ENTER to shutdown QEMU gracefully
+
+    - name: Send QMP Command to Gracefully Terminate QEMU (ACPI Shutdown)
       shell: |
-        echo -e 'qmp_capabilities\nquit\n' | nc 127.0.0.1 4444
+        printf "system_powerdown\n" | nc 127.0.0.1 4444
   tags:
-    - control_qemu_post_install
-
-- name: Configure QEMU Startup Post Proxmox Installation
-  block:
-    - name: Provide Instructions for VNC Re-connection, Network Configuration and VM Shutdown
-      debug:
-        msg: 
-          - "Reconnect to VNC server at '{{ ip_address }}:5900' with password '{{ vnc_password }}'."
-          - "Run: 'curl {{ termbin_url.stdout | trim }} | tee /etc/network/interfaces' to import network config to Proxmox."
-          - "VM is now booting from the installed Proxmox system on disks."
-          - "After completing tasks, shut down VM using: 'shutdown now'."
-
-    - name: Kick off QEMU Without CDROM After Proxmox Installation
-      shell: |
-        printf 'change vnc password\n%s\n' {{ vnc_password }} | qemu-system-x86_64 -enable-kvm -m {{ vm_memory }} \
-        -hda /dev/{{ disk_info.stdout_lines[0].split(' ')[0] }} \
-        -hdb /dev/{{ disk_info.stdout_lines[1].split(' ')[0] }} \
-        -vnc :0,password -monitor stdio \
-        -netdev user,id=user.0,hostfwd=tcp::2222-:22 \
-        -device virtio-net,netdev=user.0
-  tags:
-    - configure_qemu_startup
+    - control_qemu_pause
 
 - name: Manage Rescue System Reboot
   block:
     - name: Wait for User to Reboot the Rescue System
       pause:
-        prompt: "Press ENTER to reboot the Rescue system into Proxmox VE"
+        prompt: |
+
+          Press ENTER to reboot the Rescue system into Proxmox VE
 
     - name: Initiate Rescue System Reboot
-      ansible.builtin.reboot:
-        reboot_timeout: 10
+      shell: sleep 5 && shutdown -r now
+      async: 1
+      poll: 0
+      ignore_errors: true
+
+    - name: Display Proxmox VE Access Information
+      debug:
+        msg:
+          - "Proxmox VE has been successfully installed and should be booting up (in few seconds)."
+          - "You can access the Proxmox VE interface at:"
+          - "https://{{ ip_address }}:8006"
   tags:
     - manage_rescue_system_reboot

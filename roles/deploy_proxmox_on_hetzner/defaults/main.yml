@@ -3,12 +3,21 @@
 ## Proxmox Official  Images: http://download.proxmox.com/iso/
 
 ## Proxmox ISO Image
-image_url: "http://download.proxmox.com/iso/proxmox-ve_7.4-1.iso"
-image_name: "proxmox-ve.iso"
+## Comment out the image_url variable to use the latest version, or specify a specific version
+# image_url: ""
+
+base_url: "http://download.proxmox.com/iso/"
+image_path: "/tmp/proxmox-ve.iso"
 
 vm_memory: 10240
-vm_cores: 4
 
 vnc_password: "MyVNCP4ssw0rd"
+proxmox_password: "MySSHP4assw0rd"
+
+proxmox_host: localhost
+proxmox_ssh_port: 2222
+network_config_local_path: "/tmp/proxmox_network_config"
+network_config_remote_path: "/etc/network/interfaces"
+nameserver: "1.1.1.1"
 
 # network_interface: enp35s0
