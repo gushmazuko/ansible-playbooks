@@ -1,0 +1,60 @@
+---
+# tasks file for transfersh_setup
+
+- name: Remove old installation
+  ansible.builtin.file:
+    path: "{{ transfersh_path }}"
+    state: absent
+  when: transfersh_force_install
+  tags:
+    - transfersh_setup
+    - transfersh_setup_remove
+
+- name: Check if .transfersh exists
+  ansible.builtin.stat:
+    path: "{{ transfersh_path }}"
+  register: transfersh_setup_stat_transfersh
+  tags:
+    - transfersh_setup
+    - transfersh_setup_check
+
+- name: Create transfersh directory
+  ansible.builtin.file:
+    path: "{{ transfersh_path }}"
+    state: directory
+    mode: '0755'
+  tags:
+    - transfersh_setup
+    - transfersh_setup_copy
+
+- name: Copy transfersh script
+  ansible.builtin.copy:
+    src: transfer.sh
+    dest: "{{ transfersh_path }}/transfer.sh"
+    mode: '0755'
+  when: not transfersh_setup_stat_transfersh.stat.exists
+  tags:
+    - transfersh_setup
+    - transfersh_setup_copy
+
+- name: Change transfer.sh URL
+  ansible.builtin.lineinfile:
+    path: "{{ transfersh_path }}/transfer.sh"
+    state: present
+    regexp: '^transfersh_url='
+    line: 'transfersh_url="{{ transfersh_url }}"'
+  tags:
+    - transfersh_setup
+    - transfersh_setup_change_url
+
+- name: Add transfersh to .aliasrc
+  ansible.builtin.lineinfile:
+    path: "{{ aliasrc_path }}"
+    state: present
+    regexp: '^alias trs=.*'
+    line: 'alias trs="{{ transfersh_path }}/transfer.sh"'
+    create: true
+    mode: '0644'
+  tags:
+    - transfersh_setup
+    - transfersh_setup_add_alias

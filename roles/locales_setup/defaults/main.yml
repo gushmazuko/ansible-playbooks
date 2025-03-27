@@ -1,0 +1,11 @@
+---
+# defaults file for locales_setup
+
+# List of locales to generate
+locale_block: |
+  en_US.UTF-8 UTF-8
+  fr_FR.UTF-8 UTF-8
+# Add more locales as needed
+
+# Default locale to set
+default_locale: en_US.UTF-8

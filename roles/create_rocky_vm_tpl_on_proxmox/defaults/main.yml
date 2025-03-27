@@ -1,0 +1,20 @@
+---
+# defaults file for create_rocky_vm_tpl_on_proxmox
+## Archlinux Official Cloud Images: https://dl.rockylinux.org/pub/rocky/9/images/x86_64/
+
+## Rocky Cloud Image
+release_number: 9
+image_url: "https://dl.rockylinux.org/pub/rocky/{{ release_number }}/images/x86_64"
+image_name: "Rocky-{{ release_number }}-GenericCloud-Base.latest.x86_64.qcow2"
+
+vm_template: "ci-rocky-{{ release_number }}-tpl"
+vm_memory: 2048
+vm_cores: 4
+vm_sockets: 1
+numa: 1
+storage: "local-zfs" # pvesm status
+vm_id: 9004
+network_bridge: vmbr0
+
+## Cloud Init
+# public_ssh_key: # public SSH Key string

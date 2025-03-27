@@ -1,0 +1,24 @@
+auto lo
+iface lo inet loopback
+
+auto {{ proxmox_nic1 }}
+iface {{ proxmox_nic1 }} inet manual
+
+auto {{ proxmox_nic2 }}
+iface {{ proxmox_nic2 }} inet manual
+
+allow-vmbr0 bond0
+iface bond0 inet manual
+    ovs_bonds {{ proxmox_nic1 }} {{ proxmox_nic2 }} 
+    ovs_type OVSBond
+    ovs_bridge vmbr0
+    ovs_options bond_mode=balance-tcp lacp=active other_config:lacp-time=fast
+
+allow-ovs vmbr0
+iface vmbr0 inet static
+    address {{ proxmox_ip_cidr }}
+    gateway {{ proxmox_gateway }}
+    ovs_type OVSBridge
+    ovs_ports bond0
+    nameserver 1.1.1.1
+    nameserver 8.8.8.8

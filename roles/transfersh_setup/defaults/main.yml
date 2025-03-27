@@ -1,0 +1,7 @@
+---
+# defaults file for transfersh_setup
+transfersh_force_install: false
+transfersh_path: "~/.transfersh"
+transfersh_url: "https://free.keep.sh"
+
+aliasrc_path: "~/.aliasrc"

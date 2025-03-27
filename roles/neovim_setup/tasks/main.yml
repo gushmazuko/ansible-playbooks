@@ -1,0 +1,24 @@
+---
+# tasks file for neovim-setup
+- name: Install Neovim
+  ansible.builtin.package:
+    name: neovim
+    state: latest
+  tags:
+    - neovim_setup
+
+- name: Create Neovim configuration directory
+  ansible.builtin.file:
+    path: ~/.config/nvim
+    state: directory
+    mode: '0755'
+  tags:
+    - neovim_setup
+
+- name: Copy Neovim configuration file
+  ansible.builtin.copy:
+    src: files/nvim/init.vim
+    dest: ~/.config/nvim/init.vim
+    mode: '0644'
+  tags:
+    - neovim_setup

@@ -1,0 +1,18 @@
+auto lo
+iface lo inet loopback
+
+auto {{ proxmox_nic1 }}
+allow-vmbr0 {{ proxmox_nic1 }}
+iface {{ proxmox_nic1 }} inet manual
+    ovs_type OVSPort
+    ovs_bridge vmbr0
+
+allow-ovs vmbr0
+iface vmbr0 inet static
+    address {{ proxmox_ip_cidr }}
+    gateway {{ proxmox_gateway }}
+    ovs_type OVSBridge
+    ovs_mtu {{ proxmox_ovs_mtu }}
+    ovs_ports {{ proxmox_nic1 }}
+    nameserver {{ proxmox_nameserver1 }}
+    nameserver {{ proxmox_nameserver2 }}

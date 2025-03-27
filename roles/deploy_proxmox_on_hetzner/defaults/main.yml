@@ -1,6 +1,6 @@
 ---
 # defaults file for deploy_proxmox_on_hetzner
-## Proxmox Official  Images: http://download.proxmox.com/iso/
+## Proxmox Official Images: http://download.proxmox.com/iso/
 
 ## Proxmox ISO Image
 ## Comment out the image_url variable to use the latest version, or specify a specific version
@@ -20,4 +20,7 @@ network_config_local_path: "/tmp/proxmox_network_config"
 network_config_remote_path: "/etc/network/interfaces"
 nameserver: "1.1.1.1"
 
-# network_interface: enp35s0
+## Post Install Pause for Manual Intervention
+proxmox_pause_for_manual_intervention: false
+
+# actual_interface_name: "enp37s0f1np1"

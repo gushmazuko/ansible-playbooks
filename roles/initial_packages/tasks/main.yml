@@ -1,0 +1,18 @@
+---
+# tasks file for initial_packages
+- name: Update && Upgrade OS
+  ansible.builtin.apt:
+    update_cache: true
+    autoclean: true
+    autoremove: true
+    upgrade: full
+  tags:
+    - update
+
+- name: Install initial packages (Debian OS family)
+  ansible.builtin.apt:
+    name: "{{ debian_pkg_list }}"
+    update_cache: true
+    state: present
+  tags: 
+    - packages

@@ -1,0 +1,19 @@
+---
+# defaults file for create_archlinux_vm_tpl_on_proxmox
+## Archlinux Official Cloud Images: https://geo.mirror.pkgbuild.com/images/latest/
+
+## Archlinux Cloud Image
+image_url: "https://geo.mirror.pkgbuild.com/images/latest"
+image_name: "Arch-Linux-x86_64-cloudimg.qcow2"
+
+vm_template: "ci-archlinux-tpl"
+vm_memory: 2048
+vm_cores: 4
+vm_sockets: 1
+numa: 1
+storage: "local-zfs" # pvesm status
+vm_id: 9003
+network_bridge: vmbr0
+
+## Cloud Init
+# public_ssh_key: # public SSH Key string

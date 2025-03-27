@@ -1,0 +1,6 @@
+{
+    "ansible.python.interpreterPath": "/bin/python",
+    "yaml.schemas": {
+        "https://raw.githubusercontent.com/ansible/ansible-lint/main/src/ansiblelint/schemas/ansible.json#/$defs/tasks": "file:///home/mg/Scripts/personal/git/ansible-playbooks/roles/truenas_qemu_guest_agent_setup/tasks/main.yml"
+    }
+}

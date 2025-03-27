@@ -2,9 +2,9 @@
 # defaults file for create_debian_vm_tpl_on_proxmox
 ## Debian Official Cloud Images: https://cloud.debian.org/images/cloud/
 
-## Set bullseye or buster
-release_name: bullseye
-release_number: 11
+## Set release name and number
+release_name: bookworm
+release_number: 12
 
 ## Debian GenericCloud Image
 image_url: "https://cloud.debian.org/images/cloud/{{ release_name }}/latest"

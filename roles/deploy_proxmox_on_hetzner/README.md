@@ -1,38 +1,44 @@
-Role Name
-=========
+# Deploy Proxmox on Hetzner
+This role deploys Proxmox on a Hetzner server via the rescue system.
 
-A brief description of the role goes here.
+## How to
+```bash
+ansible-playbook ./deploy_proxmox_on_hetzner.yml \
+-e working_host=rescue_ip_address \
+-e ansible_ssh_port=22
+```
 
-Requirements
-------------
+Variables description:
+- `working_host`: Proxmox host IP
+- `vnc_password`: VNC password
+- `proxmox_password`: Proxmox root user password
+- `proxmox_pause_for_manual_intervention`: Pause the playbook for manual intervention
+- `vm_memory`: VM memory in MB
 
-Any pre-requisites that may not be covered by Ansible itself or the role should be mentioned here. For instance, if the role uses the EC2 module, it may be a good idea to mention in this section that the boto package is required.
+Default variables are declared in `./defaults/main.yml`
 
-Role Variables
---------------
+## Troubleshooting
+If you can't connect to the proxmox web interface, try to regenate the certificates:
+```bash
+rm -f /etc/pve/pve-root-ca.pem /etc/pve/priv/pve-root-ca.* /etc/pve/local/pve-ssl.*;
+pvecm updatecerts -f;
+```
 
-A description of the settable variables for this role should go here, including any variables that are in defaults/main.yml, vars/main.yml, and any variables that can/should be set via parameters to the role. Any variables that are read from other roles and/or the global scope (ie. hostvars, group vars, etc.) should be mentioned here as well.
 
-Dependencies
-------------
+## Manual Boot Installed Proxmox
 
-A list of other roles hosted on Galaxy should go here, plus any details in regards to parameters that may need to be set for other roles, or variables that are used from other roles.
+### Start QEMU on physical disks
+qemu-system-x86_64 -daemonize -enable-kvm -m 10240 \
+        -hda /dev/$VM_DISK1 \
+        -hdb /dev/$VM_DISK2 \
+        -vnc :0,password=on -monitor telnet:127.0.0.1:4444,server,nowait \
+        -net user,hostfwd=tcp::2222-:22 -net nic
 
-Example Playbook
-----------------
+## Set VNC Password
+echo "change vnc password $MySecurePassword" | nc -q 1 127.0.0.1 4444
 
-Including an example of how to use your role (for instance, with variables passed in as parameters) is always nice for users too:
 
-    - hosts: servers
-      roles:
-         - { role: username.rolename, x: 42 }
-
-License
--------
-
-BSD
-
-Author Information
-------------------
-
-An optional section for the role authors to include contact information, or a website (HTML is not allowed).
+### Access the VM (Proxmox)
+Connect to the VM (Proxmox) via:
+- VNC at $RESCUE_IP_ADDRESS:5900 using the password $MySecurePassword
+- SSH at `root@$RESCUE_IP_ADDRESS -p 2222` using the password $YourRealProxmoxPassword

@@ -1,0 +1,32 @@
+---
+# tasks file for locales_setup
+
+- name: Set default locale
+  ansible.builtin.debconf:
+    name: locales
+    question: locales/default_environment_locale
+    value: "{{ default_locale }}"
+    vtype: select
+  when: ansible_facts['os_family'] == "Debian"
+  tags:
+    - locales_setup
+
+- name: Generate locales
+  ansible.builtin.blockinfile:
+    path: /etc/locale.gen
+    marker: "# {mark} ANSIBLE LOCALE"
+    block: "{{ locale_block }}"
+  when: ansible_facts['os_family'] == "Debian"
+  tags:
+    - locales_setup
+
+- name: Execute locale generation commands
+  ansible.builtin.command:
+    cmd: "{{ item }}"
+  loop:
+    - dpkg-reconfigure locales -f noninteractive
+    - /usr/sbin/locale-gen
+  changed_when: true
+  when: ansible_facts['os_family'] == "Debian"
+  tags:
+    - locales_setup

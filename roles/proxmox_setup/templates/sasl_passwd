@@ -1,0 +1,1 @@
+{{ proxmox_smtp_server }}:587 {{ proxmox_smtp_username }}:{{ proxmox_smtp_password }}

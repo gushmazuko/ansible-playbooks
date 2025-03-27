@@ -1,0 +1,7 @@
+galaxy_info:
+  author: gushmazuko
+  description: Setup hostname and domain name
+  license: MIT
+  min_ansible_version: "2.1"
+  galaxy_tags: []
+dependencies: []

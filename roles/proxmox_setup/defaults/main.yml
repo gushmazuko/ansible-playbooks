@@ -1,0 +1,94 @@
+---
+# defaults file for proxmox-setup
+proxmox_reboot: true
+proxmox_change_hostname: true
+proxmox_hostname: "{{ ansible_facts['hostname'] }}"
+proxmox_domain: "{{ ansible_facts['domain'] }}"
+
+## Set null to auto detection
+# proxmox_ip_cidr: null
+# proxmox_nic1: null
+# proxmox_nic2: null
+
+proxmox_gateway: "{{ ansible_facts['default_ipv4']['gateway'] }}"
+proxmox_bridge_mode: single
+proxmox_ovs_mtu: 1500
+proxmox_nameserver1: 1.1.1.1
+proxmox_nameserver2: 8.8.8.8
+
+# proxmox_root_password:
+
+# proxmox_smtp_server:
+# proxmox_smtp_username:
+# proxmox_smtp_password:
+
+proxmox_pkg_list:
+  - ansiweather
+  - apt-file
+  - aptitude
+  - apt-transport-https
+  - arp-scan
+  - asciinema
+  - bwm-ng
+  - ca-certificates
+  - cloud-guest-utils
+  - curl
+  - dialog
+  - dirmngr
+  - dstat
+  - ethtool
+  - exfat-utils
+  - figlet
+  - fio
+  - fonts-noto-color-emoji
+  - fortunes
+  - fortunes-fr
+  - gdisk
+  - git
+  - gnupg2
+  - htop
+  - hwinfo
+  - iftop
+  - ifupdown2
+  - inxi
+  - ioping
+  - iotop
+  - ipcalc
+  - iperf3
+  - ipmitool
+  - libguestfs-tools
+  - libpve-network-perl
+  - libsasl2-2
+  - libsasl2-modules
+  - lsb-release
+  - lshw
+  - mlocate
+  - mtr
+  - multitail
+  - neofetch
+  - neovim
+  - netcat
+  - nethogs
+  - net-tools
+  - nmap
+  - open-iscsi
+  - openvswitch-switch
+  - parted
+  - pigz
+  - postfix
+  - pwgen
+  - rclone
+  - rsync
+  - sasl2-bin
+  - screen
+  - screenfetch
+  - shellcheck
+  - sudo
+  - sysstat
+  - tcpdump
+  - tmux
+  - vim
+  - wget
+  - xz-utils
+  - zfs-auto-snapshot
+  - zsh

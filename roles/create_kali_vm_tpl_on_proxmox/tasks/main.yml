@@ -1,94 +1,102 @@
 ---
 # tasks file for create_kali_vm_tpl_on_proxmox
-
-- name: Get latest Kali version
-  ansible.builtin.shell: |
-    curl -sL {{ image_url }} | grep -oP 'kali-linux-\K[0-9]+[0-9]+[0-9]+[0-9]+\.[0-9].?(?=-vmware)' | head -1
-  register: image_ver
+- name: Retrieve latest QEMU image URL
+  ansible.builtin.uri:
+    url: "{{ base_url }}"
+    return_content: true
+  register: webpage
+  when: qemu_image_url is not defined or qemu_image_url == ""
   tags:
-    - get_latest
+    - fetch_qemu_image
 
-- name: Set latest version to variable
-  set_fact:
-    image_version: "{{ image_ver.stdout }}"
+- name: Parse webpage content to find latest QEMU image
+  ansible.builtin.set_fact:
+    qemu_image: "{{ webpage.content | regex_findall('kali-linux-\\d+\\.\\d+-qemu-amd64\\.7z') | sort | last }}"
+  when: qemu_image_url is not defined or qemu_image_url == ""
   tags:
-    - get_latest
+    - fetch_qemu_image
 
-- name: Download latest Kali image
+- name: Construct full URL for latest QEMU image
+  ansible.builtin.set_fact:
+    qemu_image_url: "{{ base_url }}{{ qemu_image }}"
+  when: qemu_image_url is not defined or qemu_image_url == ""
+  tags:
+    - fetch_qemu_image
+
+- name: Print QEMU image URL
+  ansible.builtin.debug:
+    var: qemu_image_url
+  tags:
+    - fetch_qemu_image
+
+- name: Fetch latest QEMU image
   ansible.builtin.get_url:
-    url: "{{ image_url }}/{{ compressed_image_name }}"
-    dest: /tmp/{{ compressed_image_name }}
+    url: "{{ qemu_image_url }}"
+    dest: "{{ image_path }}"
+    mode: '0644'
+  register: get_qemu_image
+  failed_when: get_qemu_image is failed
   tags:
-    - download
+    - fetch_qemu_image
 
-- name: Decompress donwloaded image
-  ansible.builtin.shell: |
-    7z e {{ compressed_image_name }} -o{{ vmdk_image_dir }}
-  args:
-    chdir: /tmp/
+- name: Install p7zip package
+  ansible.builtin.package:
+    name: p7zip-full
+    state: present
   tags:
     - decompress_image
 
-- name: Convert image from vmdk to qcow2 format
-  ansible.builtin.shell: |
-    qemu-img convert -f vmdk {{ vmdk_image_dir }}/{{ vmdk_image_name }} -O qcow2 {{ qcow2_image_name }}
-    #rm -rf {{ vmdk_image_dir }}
-  args:
-    chdir: /tmp/
+- name: Decompress .7z archive
+  ansible.builtin.command: "7z x {{ image_path }} -o{{ qcow2_image_directory }}"
   tags:
-    - convert_image
+    - decompress_image_7z
 
-- name: Create VM
+- name: Find extracted .qcow2 file
+  ansible.builtin.find:
+    paths: "{{ qcow2_image_directory }}"
+    patterns: "kali-linux-*.qcow2"
+  register: qcow2_files
+  tags:
+    - decompress_image
+
+- name: Rename extracted files
+  ansible.builtin.file:
+    src: "{{ item.path }}"
+    dest: "{{ qcow2_image_directory }}/{{ qcow2_image_name }}"
+    state: link
+  loop: "{{ qcow2_files.files }}"
+  tags:
+    - decompress_image
+
+- name: Remove extracted .7z file
+  ansible.builtin.file:
+    path: "{{ image_path }}"
+    state: absent
+  tags:
+    - decompress_image
+
+# - name: Create VM
+#   ansible.builtin.shell: |
+#     qm create {{ vm_id }} -name {{ vm_template }} -memory {{ vm_memory }} -net0 virtio,bridge={{ network_bridge }} -cores {{ vm_cores }} -sockets {{ vm_sockets }} -cpu cputype=host -kvm 1 -numa {{ numa }} -ostype l26
+#   tags:
+#     - create_vm
+
+- name: Create UEFI VM
   ansible.builtin.shell: |
-    qm create {{ vm_id }} -name {{ vm_template }} -memory {{ vm_memory }} -net0 virtio,bridge={{ network_bridge }} -cores {{ vm_cores }} -sockets {{ vm_sockets }} -cpu cputype=host -kvm 1 -numa {{ numa }} -ostype l26
+    qm create {{ vm_id }} \
+    --name {{ vm_template }} \
+    --memory {{ vm_memory }} \
+    --sockets {{ vm_sockets }} \
+    --cores {{ vm_cores }} \
+    --cpu cputype=host \
+    --net0 virtio,bridge={{ network_bridge }} \
+    --numa {{ numa }} \
+    --ostype l26 \
+    --scsihw virtio-scsi-single \
+    --bios ovmf \
+    --efidisk0 {{ storage }}:0
   tags:
     - create_vm
-
-- name: Mount qcow2 image
-  ansible.builtin.shell: |
-    mkdir {{ mchrdir }}
-    modprobe nbd max_part=8
-    qemu-nbd --connect=/dev/nbd0 {{ qcow2_image_name }}
-    mount /dev/nbd0p1 {{ mchrdir }}
-  args:
-    chdir: /tmp/
-  tags:
-    - mount_image
-    - cloud-init
-
-- name: Chroot image & Install Cloud-Init
-  ansible.builtin.shell: |
-    mount --bind /dev {{ mchrdir }}/dev
-    mount --bind /dev/pts {{ mchrdir }}/dev/pts
-    mount --bind /proc {{ mchrdir }}/proc
-    mount --bind /sys {{ mchrdir }}/sys
-    chroot {{ mchrdir }} /bin/bash << EOF
-    echo "nameserver 1.1.1.1" | tee /etc/resolv.conf
-    echo "deb https://mirrors.ocf.berkeley.edu/kali kali-rolling main contrib non-free" | tee /etc/apt/sources.list
-    apt update
-    apt install -y cloud-init cloud-initramfs-growroot
-    sed -i -e "/    lock_passwd:\ /s/^.*$/    lock_passwd: false/" /etc/cloud/cloud.cfg.d/20_kali.cfg
-    sed -i -e "/GRUB_CMDLINE_LINUX=/s/^.*$/GRUB_CMDLINE_LINUX=\"quiet console=tty0 console=ttyS0,115200\"/" /etc/default/grub
-    update-grub
-    systemctl enable cloud-init
-    systemctl enable ssh.service
-    EOF
-  tags:
-    - chroot_image
-    - cloud-init
-
-- name: Unmount qcow2 image
-  ansible.builtin.shell: |
-    umount {{ mchrdir }}/proc
-    umount {{ mchrdir }}/dev/pts
-    umount {{ mchrdir }}/dev
-    umount {{ mchrdir }}/sys
-    umount {{ mchrdir }}
-    qemu-nbd --disconnect /dev/nbd0
-    rmmod nbd
-  tags:
-    - unmount_image
-    - cloud-init
 
 - name: Import Disk to VM
   ansible.builtin.shell: |
@@ -99,7 +107,7 @@
 
 - name: Add Disk to VM
   ansible.builtin.shell: |
-    qm set {{ vm_id }} -scsihw virtio-scsi-single --virtio0 {{ storage }}:vm-{{ vm_id }}-disk-0,discard=on,cache=writeback,iothread=1
+    qm set {{ vm_id }} --virtio0 {{ storage }}:vm-{{ vm_id }}-disk-1,discard=on,cache=writeback,iothread=1
   tags:
     - add_disk
   when: storage != "local"
@@ -107,27 +115,27 @@
 ## When `local` storage is used
 - name: Add Disk to VM (local storage)
   ansible.builtin.shell: |
-    qm set {{ vm_id }} -scsihw virtio-scsi-single --virtio0 {{ storage }}:{{ vm_id }}/vm-{{ vm_id }}-disk-0.qcow2,discard=on,cache=writeback,iothread=1
+    qm set {{ vm_id }} --virtio0 {{ storage }}:{{ vm_id }}/vm-{{ vm_id }}-disk-1.qcow2,discard=on,cache=writeback,iothread=1
   tags:
     - add_disk
   when: storage == "local"
 
 - name: Set params to VM
   ansible.builtin.shell: |
-    qm set {{ vm_id }} -ide2 {{ storage }}:cloudinit
-    qm set {{ vm_id }} -serial0 socket
-    qm set {{ vm_id }} -boot c -bootdisk virtio0
-    qm set {{ vm_id }} -agent 1
-    qm set {{ vm_id }} -hotplug disk,network,usb,memory,cpu
-    qm set {{ vm_id }} -vga qxl
+    qm set {{ vm_id }} --scsi1 {{ storage }}:cloudinit
+    qm set {{ vm_id }} --serial0 socket
+    qm set {{ vm_id }} --boot c -bootdisk virtio0
+    qm set {{ vm_id }} --agent 1
+    qm set {{ vm_id }} --hotplug disk,network,usb,memory,cpu
+    qm set {{ vm_id }} --vga qxl
   tags:
     - set_params
 
-- name: Set VM name
-  ansible.builtin.shell: |
-    qm set {{ vm_id }} --name {{ vm_template }}
-  tags:
-    - set_vm_name
+# - name: Set VM name
+#   ansible.builtin.shell: |
+#     qm set {{ vm_id }} --name {{ vm_template }}
+#   tags:
+#     - set_vm_name
 
 # - name: Copy Cloud Init config file to Proxmox
 #   ansible.builtin.template:
@@ -173,11 +181,25 @@
     - net_config
     - cloud-init
 
+# ## When `local-zfs` storage is used
+# - name: Resize VM
+#   ansible.builtin.shell: |
+#     zfs set volsize=50G rpool/data/base-{{ vm_id }}-disk-0
+#     sed -i -r '/^virtio0/s/(size=)[^,]*/\150G/' /etc/pve/qemu-server/{{ vm_id }}.conf
+#   register: vm_size 
+#   ignore_errors: true
+#   when: storage == "local-zfs"
+#   tags:
+#     - resize_vm
+#     - cloud-init
+
+# ## When `local` storage is used
 # - name: Resize VM
 #   ansible.builtin.shell: |
 #     qm resize {{ vm_id }} virtio0 50G
 #   register: vm_size 
 #   ignore_errors: true
+#   when: storage == "local"
 #   tags:
 #     - resize_vm
 #     - cloud-init
@@ -193,7 +215,7 @@
     msg:
     - "Technical info of created Template VM:"
     - "ID: {{ vm_id }}"
-    - "OS Release: {{ image_version }}"
+    - "OS Release: {{ qemu_image_url }}"
     - "Template Name: {{ vm_template }}"
   tags:
     - output

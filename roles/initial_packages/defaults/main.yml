@@ -1,0 +1,46 @@
+---
+# defaults file for initial_packages
+
+debian_pkg_list:
+  - arp-scan
+  - asciinema
+  - bwm-ng
+  - ca-certificates
+  - curl
+  - ethtool
+  - figlet
+  # - fonts-noto-color-emoji
+  - gdisk
+  - git
+  - gnupg2
+  - htop
+  - hwinfo
+  - inxi
+  - ioping
+  - iotop
+  - ipcalc
+  - iperf3
+  - ipmitool
+  - lshw
+  - mlocate
+  - mtr
+  - neofetch
+  - neovim
+  - netcat-openbsd
+  - nethogs
+  - net-tools
+  - nmap
+  - parted
+  - pigz
+  - postfix
+  - pwgen
+  - rclone
+  - rsync
+  - screenfetch
+  - shellcheck
+  - sysstat
+  - tcpdump
+  - tmux
+  - vim
+  - wget
+  - zsh

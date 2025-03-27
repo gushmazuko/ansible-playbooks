@@ -1,17 +1,17 @@
 ---
 # defaults file for create_kali_vm_tpl_on_proxmox
-## Official Kali Virtual Machine Images: https://kali.download/virtual-images/current/
+## Official Kali Images: https://cdimage.kali.org/current/
 
-## Kali Linux VMware Image
-image_url: "https://kali.download/virtual-images/current/"
-compressed_image_name: "kali-linux-{{ image_version }}-vmware-amd64.7z"
-vmdk_image_dir: "kali-linux"
-vmdk_image_name: "Kali-Linux-{{ image_version }}-vmware-amd64.vmdk"
-qcow2_image_name: "kali-linux-{{ image_version }}-amd64.qcow2"
+## Kali Linux Qemu Image
+## Comment out the image_url variable to use the latest version, or specify a specific version
+# qemu_image_url: ""
 
-mchrdir: "/mnt/chroot"
+base_url: "https://cdimage.kali.org/current/"
+image_path: "/tmp/kali-linux-qemu-amd64.7z"
+qcow2_image_name: "kali-linux-amd64.qcow2"
+qcow2_image_directory: "/tmp"
 
-vm_template: "kali-linux-{{ image_version }}-tpl"
+vm_template: "kali-linux-tpl"
 vm_memory: 2048
 vm_cores: 4
 vm_sockets: 1
@@ -19,3 +19,6 @@ numa: 1
 storage: "local-zfs" # pvesm status
 vm_id: 9000
 network_bridge: vmbr0
+
+## Cloud Init
+# public_ssh_key: # public SSH Key string

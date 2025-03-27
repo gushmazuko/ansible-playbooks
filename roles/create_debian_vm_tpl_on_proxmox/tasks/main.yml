@@ -13,9 +13,20 @@
   tags:
     - download
 
-- name: Create VM
+- name: Create UEFI VM
   ansible.builtin.shell: |
-    qm create {{ vm_id }} -name {{ vm_template }} -memory {{ vm_memory }} -net0 virtio,bridge={{ network_bridge }} -cores {{ vm_cores }} -sockets {{ vm_sockets }} -cpu cputype=host -kvm 1 -numa {{ numa }} -ostype l26
+    qm create {{ vm_id }} \
+    --name {{ vm_template }} \
+    --memory {{ vm_memory }} \
+    --sockets {{ vm_sockets }} \
+    --cores {{ vm_cores }} \
+    --cpu cputype=host \
+    --net0 virtio,bridge={{ network_bridge }} \
+    --numa {{ numa }} \
+    --ostype l26 \
+    --scsihw virtio-scsi-single \
+    --bios ovmf \
+    --efidisk0 {{ storage }}:0
   tags:
     - create_vm
 
@@ -27,7 +38,7 @@
 
 - name: Add Disk to VM
   ansible.builtin.shell: |
-    qm set {{ vm_id }} -scsihw virtio-scsi-single --virtio0 {{ storage }}:vm-{{ vm_id }}-disk-0,discard=on,cache=writeback,iothread=1
+    qm set {{ vm_id }} --virtio0 {{ storage }}:vm-{{ vm_id }}-disk-1,discard=on,cache=writeback,iothread=1
   tags:
     - add_disk
   when: storage != "local"
@@ -35,27 +46,21 @@
 ## When `local` storage is used
 - name: Add Disk to VM (local storage)
   ansible.builtin.shell: |
-    qm set {{ vm_id }} -scsihw virtio-scsi-single --virtio0 {{ storage }}:{{ vm_id }}/vm-{{ vm_id }}-disk-0.qcow2,discard=on,cache=writeback,iothread=1
+    qm set {{ vm_id }} --virtio0 {{ storage }}:{{ vm_id }}/vm-{{ vm_id }}-disk-1.qcow2,discard=on,cache=writeback,iothread=1
   tags:
     - add_disk
   when: storage == "local"
 
 - name: Set params to VM
   ansible.builtin.shell: |
-    qm set {{ vm_id }} -ide2 {{ storage }}:cloudinit
-    qm set {{ vm_id }} -serial0 socket
-    qm set {{ vm_id }} -boot c -bootdisk virtio0
-    qm set {{ vm_id }} -agent 1
-    qm set {{ vm_id }} -hotplug disk,network,usb,memory,cpu
-    qm set {{ vm_id }} -vga qxl
+    qm set {{ vm_id }} --scsi1 {{ storage }}:cloudinit
+    qm set {{ vm_id }} --serial0 socket
+    qm set {{ vm_id }} --boot c -bootdisk virtio0
+    qm set {{ vm_id }} --agent 1
+    qm set {{ vm_id }} --hotplug disk,network,usb,memory,cpu
+    qm set {{ vm_id }} --vga qxl
   tags:
     - set_params
-
-- name: Set VM name
-  ansible.builtin.shell: |
-    qm set {{ vm_id }} --name {{ vm_template }}
-  tags:
-    - set_vm_name
 
 # - name: Copy Cloud Init config file to Proxmox
 #   ansible.builtin.template:

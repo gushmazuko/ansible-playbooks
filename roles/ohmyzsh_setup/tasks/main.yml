@@ -1,0 +1,86 @@
+# tasks file for ohmyzsh-setup
+- name: Install package dependencies
+  ansible.builtin.package:
+    name:
+      - git
+      - zsh
+      - curl
+      - pigz
+    state: latest
+  tags:
+    - ohmyzsh_setup
+
+- name: Remove old Oh My Zsh installation
+  ansible.builtin.file:
+    path: "{{ ohmyzsh_path }}"
+    state: absent
+  when: ohmyzsh_force_install | default(false)
+  tags:
+    - ohmyzsh_setup
+
+- name: Check if Oh My Zsh exists
+  ansible.builtin.stat:
+    path: "{{ ohmyzsh_path }}"
+  register: ohmyzsh_stat
+  tags:
+    - ohmyzsh_setup
+
+- name: Clone Oh My Zsh git repository
+  ansible.builtin.git:
+    repo: https://github.com/ohmyzsh/ohmyzsh.git
+    dest: "{{ ohmyzsh_path }}"
+    version: master
+  when: not ohmyzsh_stat.stat.exists
+  tags:
+    - ohmyzsh_setup
+
+- name: Copy Oh My Zsh .zshrc template file
+  ansible.builtin.copy:
+    src: "{{ ohmyzsh_path }}/templates/zshrc.zsh-template"
+    dest: "{{ zshrc_path }}"
+    mode: '0644'
+  when: not ohmyzsh_stat.stat.exists
+  tags:
+    - ohmyzsh_setup
+
+- name: Change ZSH theme in .zshrc
+  ansible.builtin.lineinfile:
+    path: "{{ zshrc_path }}"
+    regexp: '^ZSH_THEME='
+    line: 'ZSH_THEME="{{ "gianu" if (ansible_env.USER == "root") else "bira" }}"'
+  when: not ohmyzsh_stat.stat.exists
+  tags:
+    - ohmyzsh_setup
+
+- name: Change user's shell to Zsh
+  ansible.builtin.user:
+    name: "{{ ansible_user }}"
+    shell: /bin/zsh
+  when: ansible_env.USER == "root"
+  tags:
+    - ohmyzsh_setup
+
+- name: Add .aliasrc source to .zshrc
+  ansible.builtin.lineinfile:
+    path: "{{ zshrc_path }}"
+    regexp: '^source {{ aliasrc_path }}'
+    line: source {{ aliasrc_path }}
+  tags:
+    - ohmyzsh_setup
+
+- name: Create .aliasrc file
+  ansible.builtin.file:
+    path: "{{ aliasrc_path }}"
+    state: touch
+    mode: '0644'
+  tags:
+    - ohmyzsh_setup
+
+- name: Add content to .aliasrc
+  ansible.builtin.blockinfile:
+    path: "{{ aliasrc_path }}"
+    state: present
+    block: "{{ ohmyzsh_aliasrc_content }}"
+    marker: ""
+  tags:
+    - ohmyzsh_setup

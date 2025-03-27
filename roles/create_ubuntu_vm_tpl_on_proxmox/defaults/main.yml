@@ -2,15 +2,15 @@
 # defaults file for create_ubuntu_vm_tpl_on_proxmox
 ## Debian Official Cloud Images: https://cloud-images.ubuntu.com/
 
-## Set hirsute or focal
-release_name: hirsute
+## Set the release name
+release_name: noble
 
 ## Ubuntu Cloud Image
 image_url: "https://cloud-images.ubuntu.com/{{ release_name }}/current"
 image_name: "{{ release_name }}-server-cloudimg-amd64.img"
 
 vm_template: "ci-ubuntu-{{ release_name }}-tpl"
-vm_memory: 2048
+vm_memory: 4096
 vm_cores: 4
 vm_sockets: 1
 numa: 1

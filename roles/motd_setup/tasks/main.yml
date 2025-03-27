@@ -1,0 +1,32 @@
+---
+# tasks file for motd_setup
+- name: Install required packages for motd
+  ansible.builtin.package:
+    name:
+      - figlet
+      - neofetch
+      - inxi
+    state: latest
+  when: ansible_facts['os_family'] == 'Debian'
+  tags:
+    - motd_setup
+
+- name: Setup motd
+  ansible.builtin.copy:
+    src: 01_motd
+    dest: /etc/update-motd.d/01-msg
+    mode: '0755'
+  when: ansible_facts['os_family'] == 'Debian'
+  tags:
+    - motd_setup
+
+- name: Remove old motd files
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /etc/update-motd.d/10-uname
+    - /etc/motd
+  when: ansible_facts['os_family'] == 'Debian'
+  tags:
+    - motd_setup

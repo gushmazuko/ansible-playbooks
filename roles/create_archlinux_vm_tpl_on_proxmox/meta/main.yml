@@ -1,0 +1,7 @@
+galaxy_info:
+  author: gushmazuko
+  description: Create a VM Template with the latest Archlinux on Proxmox VE host.
+  license: MIT
+  min_ansible_version: "2.1"
+  galaxy_tags: []
+dependencies: []

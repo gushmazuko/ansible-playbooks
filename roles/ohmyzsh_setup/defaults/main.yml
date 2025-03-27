@@ -1,0 +1,10 @@
+---
+# defaults file for ohmyzsh-setup
+ohmyzsh_force_install: false
+ohmyzsh_path: "~/.oh-my-zsh"
+zshrc_path: "~/.zshrc"
+aliasrc_path: "~/.aliasrc"
+
+## Aliases
+ohmyzsh_aliasrc_content: |
+  alias tmt='_tmt() { tar -c --use-compress-program="pigz --best --recursive" -f "${1}_$(date +%F_%H%M%S).txz" "$1"; }; _tmt'

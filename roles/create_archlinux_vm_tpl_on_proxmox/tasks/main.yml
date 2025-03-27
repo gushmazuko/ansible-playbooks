@@ -1,0 +1,123 @@
+---
+# tasks file for create_archlinux_vm_tpl_on_proxmox
+- name: Get last Archlinux Image
+  ansible.builtin.get_url:
+    url: "{{ image_url }}/{{ image_name }}"
+    dest: /tmp/{{ image_name }}
+  tags:
+    - download
+
+- name: Create UEFI VM
+  ansible.builtin.shell: |
+    qm create {{ vm_id }} \
+    --name {{ vm_template }} \
+    --memory {{ vm_memory }} \
+    --sockets {{ vm_sockets }} \
+    --cores {{ vm_cores }} \
+    --cpu cputype=host \
+    --net0 virtio,bridge={{ network_bridge }} \
+    --numa {{ numa }} \
+    --ostype l26 \
+    --scsihw virtio-scsi-single \
+    --bios ovmf \
+    --efidisk0 {{ storage }}:0
+  tags:
+    - create_vm
+
+- name: Import Disk to VM
+  ansible.builtin.shell: |
+    qm importdisk {{ vm_id }} /tmp/{{ image_name }} {{ storage }} --format qcow2
+  tags:
+    - import_disk
+
+- name: Add Disk to VM
+  ansible.builtin.shell: |
+    qm set {{ vm_id }} --virtio0 {{ storage }}:vm-{{ vm_id }}-disk-1,discard=on,cache=writeback,iothread=1
+  tags:
+    - add_disk
+  when: storage != "local"
+
+## When `local` storage is used
+- name: Add Disk to VM (local storage)
+  ansible.builtin.shell: |
+    qm set {{ vm_id }} --virtio0 {{ storage }}:{{ vm_id }}/vm-{{ vm_id }}-disk-1.qcow2,discard=on,cache=writeback,iothread=1
+  tags:
+    - add_disk
+  when: storage == "local"
+
+- name: Set params to VM
+  ansible.builtin.shell: |
+    qm set {{ vm_id }} --scsi1 {{ storage }}:cloudinit
+    qm set {{ vm_id }} --serial0 socket
+    qm set {{ vm_id }} --boot c -bootdisk virtio0
+    qm set {{ vm_id }} --agent 1
+    qm set {{ vm_id }} --hotplug disk,network,usb,memory,cpu
+    qm set {{ vm_id }} --vga qxl
+  tags:
+    - set_params
+
+# - name: Copy Cloud Init config file to Proxmox
+#   ansible.builtin.template:
+#     src: ci_config.yaml.j2
+#     dest: "/var/lib/vz/snippets/ci_config.yaml"
+#     owner: root
+#     group: root
+#     mode: u=rw,g=r,o=r
+#   tags:
+#     - ci_config
+
+# - name: Apply Cloud Init config to VM
+#   ansible.builtin.shell: |
+#     qm set {{ vm_id }} --cicustom 'user=local:snippets/ci_config.yaml'
+#   tags:
+#     - ci_config
+
+# - name: Change default user to sysadmin for CloudInit
+#   ansible.builtin.shell: |
+#     qm set {{ vm_id }} --ciuser={{ default_user }}
+#   tags:
+#     - change_default_user
+
+# - name: Change password of default user for CloudInit
+#   ansible.builtin.shell: |
+#     qm set {{ vm_id }} --cipassword={{ default_user_password }}
+#   tags:
+#     - change_default_password
+
+- name: Add Public SSH key to VM
+  ansible.builtin.shell: |
+    qm set {{ vm_id }} --sshkey <(echo '{{ public_ssh_key }}')
+  args:
+    executable: /bin/bash
+  tags:
+    - add_sshkey
+
+- name: Apply Network Config
+  ansible.builtin.shell: |
+    qm set {{ vm_id }} --ipconfig0 ip=dhcp
+  tags:
+    - net_config
+
+- name: Resize VM
+  ansible.builtin.shell: |
+    qm resize {{ vm_id }} virtio0 8G
+  register: vm_size 
+  ignore_errors: true
+  tags:
+    - resize_vm
+
+- name: Create template {{ vm_id }}
+  ansible.builtin.shell: |
+    qm template {{ vm_id }}
+  tags:
+    - create_template
+
+- name: Usefull variables
+  debug:
+    msg:
+    - "Technical info of created Template VM:"
+    - "ID: {{ vm_id }}"
+    - "OS Release: Rolling Release"
+    - "Template Name: {{ vm_template }}"
+  tags:
+    - output

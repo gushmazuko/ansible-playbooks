@@ -1,0 +1,9 @@
+#!/bin/sh
+echo "by Gushmazuko" | figlet -o
+echo
+neofetch
+inxi -c 12
+echo
+df -h -x tmpfs -x udev
+echo
+last -w | head -7

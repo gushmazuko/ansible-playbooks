@@ -1,0 +1,5 @@
+---
+# defaults file for set-hostname
+hns_hostname: linux-delta
+hns_domain: localdomain
+hns_force_hostname: true

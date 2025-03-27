@@ -1,0 +1,249 @@
+---
+# tasks file for proxmox-setup
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: '{{ proxmox_hostname }}'
+  when: proxmox_change_hostname
+  tags:
+    - proxmox_setup
+    - proxmox_setup_hostname
+
+- name: Remove Enterprise Repository
+  ansible.builtin.file:
+    path: /etc/apt/sources.list.d/pve-enterprise.list
+    state: absent
+  tags:
+    - proxmox_setup
+    - proxmox_setup_no_subscription_repo
+
+- name: Add Proxmox no-subscription Proxmox Repository
+  ansible.builtin.apt_repository:
+    repo: deb http://download.proxmox.com/debian/pve {{ ansible_distribution_release }} pve-no-subscription
+    state: present
+    filename: pve-no-subscription.list
+  tags:
+    - proxmox_setup
+    - proxmox_setup_no_subscription_repo
+
+- name: Add GPG key for no-subscription Proxmox Repository
+  ansible.builtin.apt_key:
+    url: http://download.proxmox.com/debian/proxmox-release-{{ ansible_distribution_release }}.gpg
+    state: present
+  tags:
+    - proxmox_setup
+    - proxmox_setup_gpg_key
+
+- name: Add Source list
+  ansible.builtin.copy:
+    src: sources.list
+    dest: /etc/apt/sources.list
+    owner: root
+    group: root
+    mode: '0644'
+  tags:
+    - proxmox_setup
+    - proxmox_setup_source_list
+
+- name: Update && Upgrade OS
+  ansible.builtin.apt:
+    update_cache: true
+    autoclean: true
+    autoremove: true
+    upgrade: full
+  tags:
+    - proxmox_setup
+    - proxmox_setup_upgrade
+
+- name: Install initial packages (Debian OS family)
+  ansible.builtin.apt:
+    name: "{{ proxmox_pkg_list }}"
+    update_cache: true
+    state: present
+  tags:
+    - proxmox_setup
+    - proxmox_setup_initial_packages
+
+- name: Acquire Network Configuration
+  tags:
+    - proxmox_setup
+    - proxmox_setup_get_network_info
+  block:
+    - name: Gather network interface name of vmbr0
+      ansible.builtin.shell: |
+        set -o pipefail
+        ip -o link show type bridge_slave | grep -w vmbr0 | awk '{print $2}' | sed 's/://'
+      args:
+        executable: /bin/bash
+      register: result_gather_nic1
+      changed_when: false
+      when: proxmox_nic1 is not defined
+
+    - name: Display network interface name of vmbr0
+      ansible.builtin.debug:
+        var: result_gather_nic1.stdout
+      when: proxmox_nic1 is not defined
+
+    - name: Set fact for network interface name of vmbr0
+      ansible.builtin.set_fact:
+        proxmox_nic1: "{{ result_gather_nic1.stdout }}"
+      when: proxmox_nic1 is not defined
+
+    - name: Gather IP Address & CIDR of vmbr0
+      ansible.builtin.shell: |
+        set -o pipefail
+        ip addr show vmbr0 | grep 'inet\b' | awk '{print $2}'
+      args:
+        executable: /bin/bash
+      register: result_gather_ip_cidr
+      changed_when: false
+      when: proxmox_ip_cidr is not defined
+
+    - name: Set fact for IP Address & CIDR
+      ansible.builtin.set_fact:
+        proxmox_ip_cidr: "{{ result_gather_ip_cidr.stdout }}"
+        proxmox_ip_address: "{{ result_gather_ip_cidr.stdout.split('/')[0] }}"
+      when: proxmox_ip_cidr is not defined
+
+- name: Modify hosts file
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    regexp: '^.*\n.*$'
+    line: '{{ proxmox_ip_address }} {{ proxmox_hostname }}.{{ proxmox_domain }} {{ proxmox_hostname }}'
+    backrefs: true
+    state: present
+    insertafter: '^127\.0\.0\.[01].*$'
+  when: proxmox_change_hostname
+  tags:
+    - proxmox_setup
+    - proxmox_setup_hostname
+
+- name: Setup with single interface with OpenVswitch
+  ansible.builtin.template:
+    src: single_interfaces.j2
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: '0644'
+  when: proxmox_bridge_mode == "single"
+  tags:
+    - proxmox_setup
+    - proxmox_setup_network_config
+
+- name: Setup with bond + interfaces with OpenVswitch
+  ansible.builtin.template:
+    src: dual_interfaces_via_bond.j2
+    dest: /etc/network/interfaces
+    owner: root
+    group: root
+    mode: '0644'
+  when: proxmox_bridge_mode == "bond"
+  tags:
+    - proxmox_setup
+    - proxmox_setup_network_config
+
+# - name: Activation saslauthd
+#   ansible.builtin.replace:
+#     path: /etc/default/saslauthd
+#     regexp: "START=no"
+#     replace: "START=yes"
+#   tags:
+#     - proxmox
+#     - proxmox_mail
+
+# - name: Add Postfix Relay
+#   ansible.builtin.replace:
+#       path: /etc/postfix/main.cf
+#       regexp: "relayhost ="
+#       replace: "relayhost={{ proxmox_smtp_server }}:587"
+#   tags:
+#     - proxmox
+#     - proxmox_mail
+
+# - name: Add configuration to postfix
+#   ansible.builtin.blockinfile:
+#     path: /etc/postfix/main.cf
+#     block: |
+#       smtp_use_tls=yes
+#       smtp_tls_session_cache_database = btree:${data_directory}/smtp_scache
+#       smtp_sasl_tls_security_options = noanonymous
+#       tls_random_source = dev:/dev/urandom
+#       smtp_sasl_auth_enable = yes
+#       smtp_sasl_password_maps=hash:/etc/postfix/sasl_passwd
+#       smtp_sasl_security_options = noanonymous
+#   tags:
+#     - proxmox
+#     - proxmox_mail
+
+# - name: Creating SASL_PASSWD file
+#   ansible.builtin.blockinfile:
+#     path: /etc/postfix/sasl_passwd
+#     create: yes
+#     owner: root
+#     group: root
+#     mode: u=rw,g=,o=
+#     block: |
+#       {{ proxmox_smtp_server }}:587 {{ proxmox_smtp_username }}:{{ proxmox_smtp_password }}
+#   tags:
+#     - proxmox
+#     - proxmox_mail
+
+# - name: Postmap and validate config Postfix
+#   ansible.builtin.shell: |
+#     postmap /etc/postfix/sasl_passwd
+#     postfix check
+#   args:
+#     executable: /bin/bash
+#   tags:
+#     - proxmox
+#     - proxmox_mail
+
+# - name: Restart Postfix service
+#   ansible.builtin.systemd:
+#     name: postfix.service
+#     state: restarted
+#     daemon_reload: yes
+#     enabled: yes
+#   tags:
+#     - proxmox
+#     - proxmox_mail
+
+# - name: Generate root password
+#   ansible.builtin.set_fact:
+#     proxmox_root_password: "{{ lookup('ansible.builtin.password', '/tmp/root.pass chars=ascii_letters,digits,punctuation') }}"
+#   tags:
+#     - proxmox
+#     - set_root_password
+
+# - name: Generate password hash
+#   ansible.builtin.shell: openssl passwd -1 '{{ proxmox_root_password }}'
+#   register: proxmox_root_password_hash
+#   tags:
+#     - proxmox
+#     - set_root_password
+
+# - name: Set password for user
+#   user:
+#     name: root
+#     password: "{{ proxmox_root_password_hash.stdout }}"
+#     update_password: always
+#   tags:
+#     - proxmox
+#     - set_root_password
+
+# - name: echo root password
+#   ansible.builtin.debug:
+#     msg: 'Your root password is: {{ proxmox_root_password | to_nice_json }}'
+#   tags:
+#     - proxmox
+#     - set_root_password
+
+- name: Restart remote host
+  ansible.builtin.reboot:
+    reboot_timeout: 60
+    pre_reboot_delay: 30
+    post_reboot_delay: 30
+    test_command: uptime
+  when: proxmox_reboot == "true"
+  tags:
+    - proxmox_setup
+    - proxmox_setup_reboot

@@ -1,0 +1,20 @@
+---
+# tasks file for set-hostname
+- name: Set hostname
+  ansible.builtin.hostname:
+    name: "{{ hns_hostname }}"
+  when: hns_force_hostname
+  tags:
+    - hostname
+
+- name: Modify hosts file
+  ansible.builtin.lineinfile:
+    path: /etc/hosts
+    state: present
+    insertafter: '^127.0.0.1'
+    regexp: "^127.0.1.1\\s.*"
+    line: "127.0.1.1 {{ hns_hostname }}.{{ hns_domain }} {{ hns_hostname }}"
+  when: hns_force_hostname
+  tags:
+    - hostname
+

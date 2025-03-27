@@ -1,0 +1,29 @@
+- name: Change host variable
+  hosts: localhost
+  connection: local
+  tasks:
+    - name: Use hostname from env var working_host
+      ansible.builtin.add_host:
+        name: "{{ working_host }}"
+        groups: working_group
+  tags:
+    - always
+
+- name: Proxmox Setup
+  hosts: working_group
+  gather_facts: true
+  remote_user: root
+  # become: true
+  vars:
+    ansible_roles_path: roles/
+    # ansible_python_interpreter: /usr/bin/python
+    ansible_ssh_port: 22
+  roles:
+    - proxmox_setup
+    - proxmox_remove_popup
+    - locales_setup
+    - ohmyzsh_setup
+    - transfersh_setup
+    - motd_setup
+    - neovim_setup
+  # post_tasks:

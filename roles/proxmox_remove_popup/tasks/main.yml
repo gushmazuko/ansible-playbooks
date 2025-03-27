@@ -1,0 +1,41 @@
+---
+# tasks file for proxmox_remove_popup
+- name: Remove subscription popup
+  ansible.builtin.copy:
+    src: rem_proxmox_popup.sh
+    dest: /usr/local/bin/rem_proxmox_popup.sh
+    mode: u=rwx,g=rx,o=rx
+  when: proxmox_remove_popup
+  tags:
+    - proxmox
+    - proxmox_remove_popup
+
+- name: Add rem_proxmox_popup.sh to apt.conf
+  ansible.builtin.lineinfile:
+    path: /etc/apt/apt.conf.d/100rempvepopup
+    regexp: '^DPkg::Post-Invoke'
+    line: 'DPkg::Post-Invoke {"/usr/local/bin/rem_proxmox_popup.sh";}'
+    state: present
+    create: true
+    mode: '0644'
+  when: proxmox_remove_popup
+  tags:
+    - proxmox
+    - proxmox_remove_popup
+
+- name: Execute rem_proxmox_popup.sh
+  ansible.builtin.command: /usr/local/bin/rem_proxmox_popup.sh
+  changed_when: true
+  when: proxmox_remove_popup
+  tags:
+    - proxmox
+    - proxmox_remove_popup
+
+- name: Restart pveproxy service
+  ansible.builtin.service:
+    name: pveproxy.service
+    state: restarted
+  when: proxmox_remove_popup
+  tags:
+    - proxmox
+    - proxmox_remove_popup

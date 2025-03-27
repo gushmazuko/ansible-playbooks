@@ -3,7 +3,7 @@
   connection: local
   tasks:
     - name: Use hostname from env var working_host
-      add_host:
+      ansible.builtin.add_host:
         name: "{{ working_host }}"
         groups: working_group
   tags:
@@ -15,10 +15,10 @@
   remote_user: root
   # become: true
   vars:
-    ANSIBLE_ROLES_PATH: roles/
+    ansible_roles_path: roles/
     # ansible_python_interpreter: /usr/bin/python
     ansible_ssh_port: 22
-    
+
     # image_url: "http://download.proxmox.com/iso/proxmox-ve_7.4-1.iso"
     # image_name: "proxmox-ve.iso"
 
