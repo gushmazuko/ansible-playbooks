@@ -103,10 +103,11 @@
     - name: Kick off QEMU for Proxmox Installation (asynchronously)
       vars:
         vm_disk1: "{{ disk_info.stdout_lines[1].split(' ')[0] }}"
-        # vm_disk2: "{{ disk_info.stdout_lines[0].split(' ')[0] }}"
+        vm_disk2: "{{ disk_info.stdout_lines[0].split(' ')[0] }}"
       ansible.builtin.shell: |
         qemu-system-x86_64 -daemonize -enable-kvm -m {{ vm_memory }} \
         -hda /dev/{{ vm_disk1 }} \
+        -hdb /dev/{{ vm_disk2 }} \
         -cdrom {{ image_path }} -boot d -vnc :0,password=on -monitor telnet:127.0.0.1:4444,server,nowait
       changed_when: true
 
@@ -145,9 +146,11 @@
     - name: Kick off QEMU Without CDROM After Proxmox Installation (asynchronously)
       vars:
         vm_disk1: "{{ disk_info.stdout_lines[1].split(' ')[0] }}"
+        vm_disk2: "{{ disk_info.stdout_lines[0].split(' ')[0] }}"
       ansible.builtin.shell: |
         qemu-system-x86_64 -daemonize -enable-kvm -m {{ vm_memory }} \
         -hda /dev/{{ vm_disk1 }} \
+        -hdb /dev/{{ vm_disk2 }} \
         -vnc :0,password=on -monitor telnet:127.0.0.1:4444,server,nowait \
         -net user,hostfwd=tcp::{{ proxmox_ssh_port }}-:22 -net nic
       changed_when: true
