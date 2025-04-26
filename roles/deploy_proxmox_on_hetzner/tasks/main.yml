@@ -1,72 +1,62 @@
 ---
 # tasks file for deploy_proxmox_on_hetzner
-- name: Retrieve ISO directory page
-  ansible.builtin.uri:
-    url: "{{ base_url }}"
-    return_content: true
-  register: webpage
-  when: image_url is not defined or image_url == ""
-  tags:
-    - fetch_proxmox_iso
-
 - name: Show hostvars
   ansible.builtin.debug:
       var: hostvars[inventory_hostname]
       verbosity: 2
 
-- name: Parse webpage content to find ISO versions
-  ansible.builtin.set_fact:
-    iso_version: "{{ webpage.content | regex_findall('proxmox-ve_(\\d+\\.\\d+-\\d)\\.iso') | sort | last }}"
-  when: image_url is not defined or image_url == ""
+# tasks file for deploy_proxmox_on_hetzner
+- name: Download
   tags:
     - fetch_proxmox_iso
+  block:
+  - name: Retrieve ISO directory page
+    ansible.builtin.uri:
+      url: "{{ base_url }}"
+      return_content: true
+    register: webpage
+    when: not image_url
 
-- name: Construct full URL for latest version
-  ansible.builtin.set_fact:
-    image_url: "{{ base_url }}proxmox-ve_{{ iso_version }}.iso"
-  when: image_url is not defined or image_url == ""
-  tags:
-    - fetch_proxmox_iso
+  - name: Parse webpage content to find ISO versions
+    ansible.builtin.set_fact:
+      iso_version: "{{ webpage.content | regex_findall('proxmox-ve_(\\d+\\.\\d+-\\d)\\.iso') | sort | last }}"
+    when: not image_url
 
-- name: Fetch SHA256SUMS file
-  ansible.builtin.uri:
-    url: "{{ base_url }}SHA256SUMS"
-    return_content: true
-  register: sha256sums_file
-  when: iso_sha256 is not defined or image_url is not defined or image_url == ""
-  tags:
-    - fetch_proxmox_iso
+  - name: Construct full URL for latest version
+    ansible.builtin.set_fact:
+      image_url: "{{ base_url }}proxmox-ve_{{ iso_version }}.iso"
+    when: not image_url
 
-- name: Extract SHA256 checksum for the ISO
-  ansible.builtin.set_fact:
-    iso_sha256: >-
-      {{ sha256sums_file.content.splitlines() | select("search", iso_version) | list | first | split(" ") }}
-  when:  iso_sha256 is not defined or image_url is not defined or image_url == ""
-  tags:
-    - fetch_proxmox_iso
+  - name: Fetch SHA256SUMS file
+    ansible.builtin.uri:
+      url: "{{ base_url }}SHA256SUMS"
+      return_content: true
+    register: sha256sums_file
+    when: not iso_sha256 or not image_url
 
-- name: Print SHA256 checksum
-  ansible.builtin.pause:
-    seconds: 1
-    prompt: |
-      /////////////////
-        Download {{ image_url }}
-        SHA256SUM {{ iso_sha256[0] }}
-      /////////////////
-  tags:
-    - fetch_proxmox_iso
+  - name: Extract SHA256 checksum for the ISO
+    ansible.builtin.set_fact:
+      iso_sha256: "{{ sha256sums_file.content.splitlines() | select('search', iso_version) | list | first | split(' ') | first }}"
+    when: not iso_sha256 or not image_url
 
-- name: Fetch Proxmox VE ISO
-  ansible.builtin.get_url:
-    url: "{{ image_url }}"
-    dest: "{{ image_path }}"
-    tmp_dest: "/tmp"
-    mode: '0644'
-    checksum: "sha256:{{ iso_sha256[0]}}"
-  register: get_iso
-  failed_when: get_iso is failed
-  tags:
-    - fetch_proxmox_iso
+  - name: Print SHA256 checksum
+    ansible.builtin.pause:
+      seconds: 1
+      prompt: |
+        /////////////////
+          Download {{ image_url }}
+          SHA256SUM {{ iso_sha256 }}
+        /////////////////
+
+  - name: Fetch Proxmox VE ISO
+    ansible.builtin.get_url:
+      url: "{{ image_url }}"
+      dest: "{{ image_path }}"
+      tmp_dest: "/tmp"
+      mode: '0644'
+      checksum: "sha256:{{ iso_sha256 }}"
+    register: get_iso
+    failed_when: get_iso is failed
 
 - name: Get list of disks
   ansible.builtin.shell: |
