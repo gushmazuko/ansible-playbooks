@@ -29,6 +29,21 @@
   tags:
     - fetch_qemu_image
 
+- name: Check if QEMU image already downloaded
+  ansible.builtin.stat:
+    path: "{{ image_path }}"
+  register: image_file
+  tags:
+    - fetch_qemu_image
+
+- name: Check if qcow2 file already extracted
+  ansible.builtin.find:
+    paths: "{{ qcow2_image_directory }}"
+    patterns: "kali-linux-*.qcow2"
+  register: extracted_qcow2
+  tags:
+    - fetch_qemu_image
+
 - name: Fetch latest QEMU image
   ansible.builtin.get_url:
     url: "{{ qemu_image_url }}"
@@ -36,6 +51,7 @@
     mode: '0644'
   register: get_qemu_image
   failed_when: get_qemu_image is failed
+  when: not image_file.stat.exists and extracted_qcow2.matched == 0
   tags:
     - fetch_qemu_image
 
@@ -43,11 +59,13 @@
   ansible.builtin.package:
     name: p7zip-full
     state: present
+  when: extracted_qcow2.matched == 0
   tags:
     - decompress_image
 
 - name: Decompress .7z archive
-  ansible.builtin.command: "7z x {{ image_path }} -o{{ qcow2_image_directory }}"
+  ansible.builtin.command: "7z x {{ image_path }} -o{{ qcow2_image_directory }} -y"
+  when: extracted_qcow2.matched == 0
   tags:
     - decompress_image_7z
 
@@ -75,13 +93,15 @@
   tags:
     - decompress_image
 
-# - name: Create VM
-#   ansible.builtin.shell: |
-#     qm create {{ vm_id }} -name {{ vm_template }} -memory {{ vm_memory }} -net0 virtio,bridge={{ network_bridge }} -cores {{ vm_cores }} -sockets {{ vm_sockets }} -cpu cputype=host -kvm 1 -numa {{ numa }} -ostype l26
-#   tags:
-#     - create_vm
+- name: Check if VM already exists
+  ansible.builtin.shell: qm status {{ vm_id }}
+  register: vm_exists
+  ignore_errors: true
+  changed_when: false
+  tags:
+    - create_vm
 
-- name: Create UEFI VM
+- name: Create VM
   ansible.builtin.shell: |
     qm create {{ vm_id }} \
     --name {{ vm_template }} \
@@ -92,33 +112,76 @@
     --net0 virtio,bridge={{ network_bridge }} \
     --numa {{ numa }} \
     --ostype l26 \
-    --scsihw virtio-scsi-single \
-    --bios ovmf \
-    --efidisk0 {{ storage }}:0
+    --scsihw virtio-scsi-single
+  when: vm_exists.rc != 0
   tags:
     - create_vm
+
+- name: Check if qcow2 file exists in /tmp
+  ansible.builtin.stat:
+    path: "/tmp/{{ qcow2_image_name }}"
+  register: qcow2_in_tmp
+  tags:
+    - import_disk
 
 - name: Import Disk to VM
   ansible.builtin.shell: |
     qm importdisk {{ vm_id }} /tmp/{{ qcow2_image_name }} {{ storage }} --format qcow2
-    rm -f /tmp/{{ qcow2_image_name }}
+  when: qcow2_in_tmp.stat.exists or qcow2_in_tmp.stat.islnk
   tags:
     - import_disk
 
-- name: Add Disk to VM
-  ansible.builtin.shell: |
-    qm set {{ vm_id }} --virtio0 {{ storage }}:vm-{{ vm_id }}-disk-1,discard=on,cache=writeback,iothread=1
+- name: Remove qcow2 file from /tmp
+  ansible.builtin.file:
+    path: "/tmp/{{ qcow2_image_name }}"
+    state: absent
+  when: qcow2_in_tmp.stat.exists or qcow2_in_tmp.stat.islnk
+  tags:
+    - import_disk
+
+- name: Check if virtio0 disk already attached
+  ansible.builtin.shell: qm config {{ vm_id }} | grep -q "^virtio0:"
+  register: disk_attached
+  ignore_errors: true
+  changed_when: false
   tags:
     - add_disk
-  when: storage != "local"
 
-## When `local` storage is used
-- name: Add Disk to VM (local storage)
+- name: Get storage type
+  ansible.builtin.shell: |
+    pvesm status | awk '$1=="{{ storage }}" {print $2}'
+  register: storage_type_result
+  when: disk_attached.rc != 0
+  tags:
+    - add_disk
+
+- name: Set storage type fact
+  ansible.builtin.set_fact:
+    storage_type: "{{ storage_type_result.stdout | trim }}"
+  when: disk_attached.rc != 0
+  tags:
+    - add_disk
+
+- name: Add Disk to VM (ZFS storage)
+  ansible.builtin.shell: |
+    qm set {{ vm_id }} --virtio0 {{ storage }}:vm-{{ vm_id }}-disk-0,discard=on,cache=writeback,iothread=1
+  when: disk_attached.rc != 0 and storage_type is match(".*zfs.*")
+  tags:
+    - add_disk
+
+- name: Add Disk to VM (LVM/LVMThin storage)
+  ansible.builtin.shell: |
+    qm set {{ vm_id }} --virtio0 {{ storage }}:vm-{{ vm_id }}-disk-0,discard=on,cache=writeback,iothread=1
+  when: disk_attached.rc != 0 and (storage_type == "lvm" or storage_type == "lvmthin")
+  tags:
+    - add_disk
+
+- name: Add Disk to VM (Directory storage)
   ansible.builtin.shell: |
     qm set {{ vm_id }} --virtio0 {{ storage }}:{{ vm_id }}/vm-{{ vm_id }}-disk-1.qcow2,discard=on,cache=writeback,iothread=1
+  when: disk_attached.rc != 0 and storage_type == "dir"
   tags:
     - add_disk
-  when: storage == "local"
 
 - name: Set params to VM
   ansible.builtin.shell: |

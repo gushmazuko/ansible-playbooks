@@ -12,8 +12,8 @@ qcow2_image_name: "kali-linux-amd64.qcow2"
 qcow2_image_directory: "/tmp"
 
 vm_template: "kali-linux-tpl"
-vm_memory: 2048
-vm_cores: 4
+vm_memory: 4096
+vm_cores: 8
 vm_sockets: 1
 numa: 1
 storage: "local-zfs" # pvesm status
