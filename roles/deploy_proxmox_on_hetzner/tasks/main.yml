@@ -64,7 +64,7 @@
     - name: Gather IP Address & CIDR of eth0
       ansible.builtin.shell: |
         set -o pipefail
-        ip addr show {{ actual_interface_name }} | grep "inet\b" | awk '{print $2}'
+        ip addr show {{ actual_interface_name.stdout }} | grep "inet\b" | awk '{print $2}'
       args:
         executable: /bin/bash
       register: ip_cidr
@@ -88,7 +88,7 @@
 
 - name: Generate Network Configuration for Proxmox VM
   vars:
-    interface: "{{ actual_interface_name}}"
+    interface: "{{ actual_interface_name.stdout }}"
   ansible.builtin.template:
     src: network_config.j2
     dest: "{{ network_config_local_path }}"
