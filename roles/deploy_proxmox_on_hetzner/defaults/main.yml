@@ -8,6 +8,8 @@
 
 base_url: "http://download.proxmox.com/iso/"
 image_path: "/tmp/proxmox-ve.iso"
+image_url: ~ # if you want to point to specific  download url
+iso_sha256: ~ # and coresponding SHA256 checksum
 
 vm_memory: 10240
 

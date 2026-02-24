@@ -9,7 +9,7 @@
   tags:
     - always
 
-- name: Create VM Template
+- name: Setup Proxmox PVE
   hosts: working_group
   gather_facts: true
   remote_user: root
@@ -21,9 +21,14 @@
 
     # image_url: "http://download.proxmox.com/iso/proxmox-ve_7.4-1.iso"
     # image_name: "proxmox-ve.iso"
+    # iso_sha256: 
 
     # vm_memory: 10240
     # vm_cores: 4
+
+    # vnc_password: "UseYourVeryOne"
+    # proxmox_password: "UseYourVeryOne"
+    # actual_interface_name: "enp0s31f6"  
 
   roles:
     - deploy_proxmox_on_hetzner

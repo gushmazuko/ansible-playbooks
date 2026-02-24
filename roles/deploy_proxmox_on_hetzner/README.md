@@ -8,6 +8,8 @@ ansible-playbook ./deploy_proxmox_on_hetzner.yml \
 -e ansible_ssh_port=22
 ```
 
+Hint: use a public key for the rescue system! (or deal with -k however this is not supported)
+
 Variables description:
 - `working_host`: Proxmox host IP
 - `vnc_password`: VNC password
